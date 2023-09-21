@@ -31,7 +31,7 @@ func TestCronexpr(t *testing.T) {
 	fmt.Println(nextTime)
 }
 func TestChan(t *testing.T) {
-	register := handle.NewRegister()
+	register := handle.NewRegisterHandle()
 	register.Start()
 	//register.RegisterNodeChan <- core.NewServiceNode("11", 1, "xx")
 	select {}
