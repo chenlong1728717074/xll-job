@@ -13,4 +13,5 @@ service Service{
 message Request{
   string serviceId = 1;
   int32 retry = 2;
+  int64 callbackId =3;
 }

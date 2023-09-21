@@ -8,17 +8,19 @@ import (
 )
 
 func TestDb(t *testing.T) {
-	orm.DB.AutoMigrate(&do.JobLogDo{})
+	//orm.DB.AutoMigrate(&do.JobLogDo{})
 	orm.DB.AutoMigrate(&do.JobInfoDo{})
-	orm.DB.AutoMigrate(&do.JobManagementDo{})
+	//orm.DB.AutoMigrate(&do.JobManagementDo{})
+	//orm.DB.AutoMigrate(&do.JobLockDo{})
 }
 
 func TestAdd(t *testing.T) {
-	log := &do.JobLogDo{
-		ManageId: 1,
-		JobId:    4,
+	log := &do.JobLockDo{
+		Id: 1,
 	}
-	orm.DB.Create(log)
+	tx := orm.DB.Create(log)
+	//row := tx.Row()
+	fmt.Println(tx.RowsAffected)
 }
 func TestSelect(t *testing.T) {
 	var m do.JobManagementDo
@@ -27,4 +29,5 @@ func TestSelect(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
+	"sync"
 	"time"
 	"xll-job/orm"
 	"xll-job/orm/do"
@@ -13,42 +14,45 @@ import (
 	"xll-job/scheduler/grpc/dispatch"
 )
 
-type Register struct {
+// RegisterHandle 服务注册
+type RegisterHandle struct {
 	flushDone        chan struct{}
 	registerDone     chan struct{}
 	registerNodeChan chan *core.ServiceNode
+	lock             sync.Mutex
 	dispatch.UnimplementedNodeServer
 }
 
-func NewRegister() *Register {
-	return &Register{
+func NewRegisterHandle() *RegisterHandle {
+	return &RegisterHandle{
 		flushDone:        make(chan struct{}),
 		registerDone:     make(chan struct{}),
 		registerNodeChan: make(chan *core.ServiceNode, 1000),
 	}
 }
-func (register *Register) Start() {
+func (register *RegisterHandle) Start() {
 	register.inspectServer()
-	register.registerServer()
+	//todo 该管道出现未知问题,项目中已使用替代方案,待解决后恢复此处
+	//register.registerServer()
 }
 
-func (register *Register) Register(ctx context.Context, req *dispatch.RegisterRequest) (*emptypb.Empty, error) {
+func (register *RegisterHandle) Register(ctx context.Context, req *dispatch.RegisterRequest) (*emptypb.Empty, error) {
 	var m do.JobManagementDo
 	orm.DB.First(&m, req.GetJobManagerId())
 	if m.Id == 0 {
 		return nil, errors.New("JobManagement NOT FOUND")
 	}
 	//register.registerNodeChan <- core.NewServiceNode(req.ServiceAddr, m.Id, m.AppName)
-	register.addNode(core.NewServiceNode(req.ServiceAddr, m.Id, m.AppName))
+	go register.addNode(core.NewServiceNode(req.ServiceAddr, m.Id, m.AppName))
 	return &emptypb.Empty{}, nil
 }
 
-func (register *Register) Stop(addr string) {
+func (register *RegisterHandle) Stop(addr string) {
 	register.flushDone <- struct{}{}
 	register.registerDone <- struct{}{}
 }
 
-func (register *Register) registerServer() {
+func (register *RegisterHandle) registerServer() {
 	//添加服务,刷新服务
 	go func() {
 		log.Printf("已开启服务注册服务")
@@ -58,12 +62,15 @@ func (register *Register) registerServer() {
 				fmt.Println("注册服务关闭....")
 				return
 			case node := <-register.registerNodeChan:
+				log.Println("监听到数据")
 				register.addNode(node)
+
 			}
 		}
 	}()
 }
-func (register *Register) addNode(node *core.ServiceNode) {
+func (register *RegisterHandle) addNode(node *core.ServiceNode) {
+	log.Println("进入注册服务")
 	flag := true
 	for index := range ServiceNodeList {
 		if ServiceNodeList[index].Addr == node.Addr {
@@ -73,18 +80,21 @@ func (register *Register) addNode(node *core.ServiceNode) {
 		}
 	}
 	if flag {
+		register.lock.Lock()
 		ServiceNodeList = append(ServiceNodeList, node)
+		register.lock.Unlock()
 	}
 	log.Printf("已刷新来自%s的注册\n", node.Addr)
 }
-func (register *Register) inspectServer() {
+func (register *RegisterHandle) inspectServer() {
 	go func() {
+		log.Println("服务刷新服务开启")
 		//睡十秒,等待服务注册
 		time.Sleep(time.Second * 10)
 		for {
 			select {
 			case <-register.flushDone:
-				fmt.Println("服务检查关闭服务....")
+				log.Println("服务检查关闭服务....")
 				return
 			default:
 				go flushServer()
@@ -96,7 +106,7 @@ func (register *Register) inspectServer() {
 
 func flushServer() {
 	startTime := time.Now().UnixNano() / 1000000
-	log.Printf("开始进行服务检查:%d", startTime)
+	log.Printf("开始进行服务检查:%d\n", startTime)
 
 	now := time.Now().Add(-time.Second * 90)
 	newServiceNodeList := make([]*core.ServiceNode, 0)

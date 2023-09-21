@@ -17,33 +17,26 @@ import (
 	"xll-job/web/router"
 )
 
-type XllJob struct {
+type XllJobApp struct {
 	port       int
 	engine     *gin.Engine
 	grpcServer *grpc.Server
 }
 
-func NewApp(port int) *XllJob {
-	return &XllJob{
+func NewXllJobApp(port int) *XllJobApp {
+	return &XllJobApp{
 		port:   port,
 		engine: gin.Default(),
 	}
 }
-
-func LoadCache() {
-	//加载所有的管理器
-
-	//然后再加载所有的任务
-}
-
-func (app *XllJob) Start() {
+func (app *XllJobApp) Start() {
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", app.port),
 		Handler: app.engine, // 使用 Gin 引擎作为处理程序
 	}
 
 	//初始化任务
-	job := handle.NewXllJob()
+	job := handle.NewXllJobHandle()
 	handle.Xll_Job = job
 	job.LoadJob()
 	job.Start()
@@ -61,12 +54,13 @@ func (app *XllJob) Start() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutdown Server ...")
-
+	job.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Println("Server Shutdown err:", err)
 	}
+
 	log.Println("Server exiting")
 }
 func grpcLis() *grpc.Server {
@@ -75,9 +69,13 @@ func grpcLis() *grpc.Server {
 		panic(err)
 	}
 	server := grpc.NewServer()
-	dispatch.RegisterNodeServer(server, handle.NewRegister())
+	dispatch.RegisterNodeServer(server, handle.NewRegisterHandle())
+	dispatch.RegisterJobServer(server, handle.NewJobMonitorHandle())
 	go func() {
-		server.Serve(lis)
+		err := server.Serve(lis)
+		if err != nil {
+			log.Fatalf("Grpc Service startup failed:%s", err.Error())
+		}
 	}()
 	return server
 }

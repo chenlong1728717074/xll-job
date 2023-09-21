@@ -4,7 +4,7 @@ import (
 	"xll-job/scheduler/core"
 )
 
-var Xll_Job *XllJob
+var Xll_Job *XllJobHandle
 
 var JobManagerMap map[int64]*core.JobManager
 

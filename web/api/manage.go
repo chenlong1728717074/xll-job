@@ -38,12 +38,13 @@ func (managementApi *JobManagementApi) GetById(ctx *gin.Context) {
 	for _, node := range manager.ServerAddr {
 		addrs = append(addrs, node.Addr)
 	}
-	ctx.JSON(200, vo.JobManagementVo{
+
+	ctx.JSON(200, dto.NewOkResponse(vo.JobManagementVo{
 		ID:            manager.Id,
 		Name:          manager.Name,
 		AppName:       manager.AppName,
 		OnlineMachine: addrs,
-	})
+	}))
 }
 
 func (managementApi *JobManagementApi) Add(ctx *gin.Context) {

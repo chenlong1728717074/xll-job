@@ -64,7 +64,7 @@ func (jobInfoApi *JobInfoApi) Add(ctx *gin.Context) {
 	orm.DB.Create(&jobInfoDo)
 	//添加缓存
 	manager := handle.JobManagerMap[jobDto.ManageId]
-	scheduler, _ := core.NewScheduler(jobInfoDo.Cron, jobInfoDo.JobHandler, manager, false)
+	scheduler, _ := core.NewScheduler(jobInfoDo.Retry, jobInfoDo.Cron, jobInfoDo.JobHandler, manager, false)
 	manager.Schedulers[jobInfoDo.Id] = scheduler
 	ctx.JSON(200, map[string]interface{}{
 		"message": "ok",

@@ -8,7 +8,7 @@ import (
 
 /*todo 前期采用robfig的cron,后期将会利用cronexpr实现支持年的定时任务*/
 func main() {
-	server := app.NewApp(8081)
+	server := app.NewXllJobApp(8081)
 	server.Start()
 }
 

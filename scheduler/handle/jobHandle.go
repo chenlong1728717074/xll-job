@@ -10,23 +10,25 @@ import (
 	"xll-job/scheduler/core"
 )
 
-type XllJob struct {
+const sql = "DELETE FROM tb_job_lock"
+
+type XllJobHandle struct {
 	lock     sync.RWMutex
 	Trigger  *cron.Cron
 	Manager  map[int64]*core.JobManager
-	register *Register
+	register *RegisterHandle
 }
 
-func NewXllJob() *XllJob {
-	job := XllJob{
+func NewXllJobHandle() *XllJobHandle {
+	job := XllJobHandle{
 		lock:     sync.RWMutex{},
-		register: NewRegister(),
+		register: NewRegisterHandle(),
 	}
 	return &job
 }
 
 // InitXllJob  不确定之后会不会有其他操作,所以先把初始化操作单独抽出/** **/
-func (job *XllJob) InitXllJob() {
+func (job *XllJobHandle) InitXllJob() {
 	//先初始化
 	if job.Trigger == nil {
 		job.Trigger = cron.New(cron.WithParser(cron.NewParser(
@@ -39,17 +41,26 @@ func (job *XllJob) InitXllJob() {
 		JobManagerMap = job.Manager
 	}
 }
-func (job *XllJob) Start() {
+func (job *XllJobHandle) Start() {
 	job.Trigger.Start()
 	job.register.Start()
 }
 
-func (job *XllJob) LoadJob() {
+func (job *XllJobHandle) Stop() {
+	job.register.registerDone <- struct{}{}
+	job.register.flushDone <- struct{}{}
+}
+
+func (job *XllJobHandle) LoadJob() {
 	/**不确定之后需不需要加锁,先预留代码*/
 	/*job.lock.Lock()
 	defer job.lock.Unlock()*/
 	//先初始化
 	job.InitXllJob()
+	//删除所有锁
+	if err := orm.DB.Exec(sql).Error; err != nil {
+		log.Fatal("Failed to delete data: ", err)
+	}
 	//加载所有任务管理器
 	log.Println("开始加载任务管理器")
 	var managers []do.JobManagementDo
@@ -66,8 +77,9 @@ func (job *XllJob) LoadJob() {
 		}
 		for _, infoDo := range jobs {
 			if infoDo.Enable {
-				scheduler, _ := core.NewScheduler(infoDo.Cron,
+				scheduler, _ := core.NewScheduler(infoDo.Retry, infoDo.Cron,
 					infoDo.JobHandler, jobManager, true)
+				scheduler.Id = infoDo.Id
 				jobManager.Schedulers[infoDo.Id] = scheduler
 				//任务逻辑
 				enId, _ := Xll_Job.Trigger.AddFunc(infoDo.Cron, scheduler.Execute)

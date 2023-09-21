@@ -6,6 +6,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"testing"
 	"time"
+	"xll-job/scheduler/handle"
 )
 
 func TestCron(t *testing.T) {
@@ -28,4 +29,10 @@ func TestCronexpr(t *testing.T) {
 	}
 	nextTime := expr.Next(time.Now())
 	fmt.Println(nextTime)
+}
+func TestChan(t *testing.T) {
+	register := handle.NewRegister()
+	register.Start()
+	//register.RegisterNodeChan <- core.NewServiceNode("11", 1, "xx")
+	select {}
 }
