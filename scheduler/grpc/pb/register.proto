@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/empty.proto";
+
+option go_package = '.proto';
+
+service Node{
+  rpc register(RegisterRequest) returns (google.protobuf.Empty);
+}
+
+message RegisterRequest{
+  string serviceAddr = 1;
+  int64 jobManagerId=2;
+  string jobManagerName=3;
+}

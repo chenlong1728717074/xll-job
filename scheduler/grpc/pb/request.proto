@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/empty.proto";
+
+option go_package = '.proto';
+
+service Service{
+  rpc call(Request) returns (google.protobuf.Empty); //用户列表
+}
+
+message Request{
+  string serviceId = 1;
+  int32 retry = 2;
+}
