@@ -70,7 +70,6 @@ func (register *RegisterHandle) registerServer() {
 	}()
 }
 func (register *RegisterHandle) addNode(node *core.ServiceNode) {
-	log.Println("进入注册服务")
 	flag := true
 	for index := range ServiceNodeList {
 		if ServiceNodeList[index].Addr == node.Addr {
@@ -84,7 +83,7 @@ func (register *RegisterHandle) addNode(node *core.ServiceNode) {
 		ServiceNodeList = append(ServiceNodeList, node)
 		register.lock.Unlock()
 	}
-	log.Printf("已刷新来自%s的注册\n", node.Addr)
+	log.Printf("Registration from[%s]has been refreshed\n", node.Addr)
 }
 func (register *RegisterHandle) inspectServer() {
 	go func() {

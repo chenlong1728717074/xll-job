@@ -19,7 +19,6 @@ type JobLogDo struct {
 	ExecuteEndTime       *time.Time `gorm:"comment:执行结束时间"`
 	ExecuteConsumingTime int64      `gorm:"comment:执行耗时"`
 	ExecuteStatus        int32      `gorm:"comment:执行状态 -1:未开始 1:进行中 2:执行成功 3:执行出现异常 4:执行超时"`
-	ExecuteLogs          string     `gorm:"comment:执行日志"`
 }
 
 func (JobLogDo) TableName() string {

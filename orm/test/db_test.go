@@ -9,9 +9,10 @@ import (
 
 func TestDb(t *testing.T) {
 	//orm.DB.AutoMigrate(&do.JobLogDo{})
-	orm.DB.AutoMigrate(&do.JobInfoDo{})
+	//orm.DB.AutoMigrate(&do.JobInfoDo{})
 	//orm.DB.AutoMigrate(&do.JobManagementDo{})
 	//orm.DB.AutoMigrate(&do.JobLockDo{})
+	orm.DB.AutoMigrate(&do.ExecutionLog{})
 }
 
 func TestAdd(t *testing.T) {
@@ -29,5 +30,8 @@ func TestSelect(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-
+	lock := do.JobLockDo{
+		Id: 0,
+	}
+	orm.DB.Delete(lock)
 }

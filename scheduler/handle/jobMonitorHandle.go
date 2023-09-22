@@ -3,12 +3,12 @@ package handle
 import (
 	"context"
 	"errors"
-	"fmt"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"xll-job/orm"
 	"xll-job/orm/do"
 	"xll-job/scheduler/grpc/dispatch"
+	"xll-job/scheduler/util"
 )
 
 // JobMonitorHandle  这个结构体用于任务失败监听/**/
@@ -23,42 +23,6 @@ func NewJobMonitorHandle() *JobMonitorHandle {
 		retryDone:   make(chan struct{}),
 		timeoutDone: make(chan struct{}),
 	}
-}
-func (*JobMonitorHandle) Callback(ctx context.Context, resp *dispatch.CallbackResponse) (*emptypb.Empty, error) {
-	fmt.Println("接收到回调消息", resp)
-	var jobLog do.JobLogDo
-	orm.DB.First(&jobLog, resp.GetId())
-	if jobLog.Id == 0 {
-		return nil, errors.New("entry does not exist")
-	}
-	var job do.JobInfoDo
-	orm.DB.First(&job, jobLog.JobId)
-	if job.Id == 0 || !job.Enable {
-		jobLog.ExecuteStatus = 3
-		jobLog.Retry = 0
-	} else {
-		jobLog.ExecuteStatus = resp.Status
-		startTime := resp.StartTime.AsTime()
-		endTime := resp.EndTime.AsTime()
-		jobLog.ExecuteStartTime = &startTime
-		jobLog.ExecuteEndTime = &endTime
-		consumingTime := (endTime.UnixNano() / 1000000) - (startTime.UnixNano() / 1000000)
-		if consumingTime == 0 {
-			consumingTime = 1
-		}
-		jobLog.ExecuteConsumingTime = consumingTime
-		logs := ""
-		for _, s := range resp.Logs {
-			logs += s + "\n"
-		}
-		jobLog.ExecuteLogs = logs
-		lock := do.JobLockDo{
-			Id: job.Id,
-		}
-		orm.DB.Delete(lock)
-	}
-	orm.DB.Updates(&jobLog)
-	return &emptypb.Empty{}, nil
 }
 
 func (jobMonitor *JobMonitorHandle) Start() {
@@ -78,4 +42,61 @@ func (jobMonitor *JobMonitorHandle) EnableTimeoutScan() {
 		log.Println("开启超时任务处理")
 		select {}
 	}()
+}
+
+func (jobMonitor *JobMonitorHandle) Callback(ctx context.Context, resp *dispatch.CallbackResponse) (*emptypb.Empty, error) {
+	var jobLog do.JobLogDo
+	orm.DB.First(&jobLog, resp.GetId())
+	if jobLog.Id == 0 {
+		return nil, errors.New("entry does not exist")
+	}
+	//async handle log
+	go jobMonitor.handleLog(&jobLog, resp)
+	return &emptypb.Empty{}, nil
+}
+
+func (jobMonitor *JobMonitorHandle) handleLog(jobLog *do.JobLogDo, resp *dispatch.CallbackResponse) {
+	var job do.JobInfoDo
+	orm.DB.First(&job, jobLog.JobId)
+	if job.Id == 0 || !job.Enable {
+		jobLog.Retry = 0
+	}
+	jobLog.ExecuteStatus = resp.Status
+	startTime := resp.StartTime.AsTime()
+	endTime := resp.EndTime.AsTime()
+	jobLog.ExecuteStartTime = &startTime
+	jobLog.ExecuteEndTime = &endTime
+	jobLog.ExecuteConsumingTime = util.ComputingTime(startTime, endTime)
+	orm.DB.Updates(&jobLog)
+	jobMonitor.handleExecuteLog(resp.GetId(), resp.Logs)
+	jobMonitor.Unlock(job.Id)
+}
+
+func (jobMonitor *JobMonitorHandle) Unlock(id int64) {
+	if id == 0 {
+		return
+	}
+	lock := &do.JobLockDo{
+		Id: id,
+	}
+	orm.DB.Delete(lock)
+}
+
+func (jobMonitor *JobMonitorHandle) handleExecuteLog(id int64, logs []string) {
+	//日志处理
+	var executeLogDo do.ExecutionLog
+	orm.DB.Select("id").First(&executeLogDo, id)
+	executeLogs := "--------------以下是执行日志--------------\n"
+	if len(logs) != 0 {
+		for _, s := range logs {
+			executeLogs += s + "\n"
+		}
+	}
+	executeLogDo.ExecuteLogs = executeLogs
+	if executeLogDo.Id == 0 {
+		executeLogDo.Id = id
+		orm.DB.Create(&executeLogDo)
+	} else {
+		orm.DB.Updates(&executeLogDo)
+	}
 }
