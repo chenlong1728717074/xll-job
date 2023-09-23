@@ -38,13 +38,12 @@ func TestSelect(t *testing.T) {
 }
 
 func TestSelectSql(t *testing.T) {
-	var jobLogs []bo.JobTimeoutBo
-	orm.DB.Raw(constant.EffectiveTimeoutJob).Scan(&jobLogs)
+	var jobLogs []bo.RetryJobBo
+	orm.DB.Raw(constant.RetryJob).Scan(&jobLogs)
 	fmt.Println(jobLogs)
 	fmt.Println(len(jobLogs))
-	for i := range jobLogs {
-		fmt.Println(jobLogs[i].Timeout)
-	}
+	fmt.Println(jobLogs[0].Enable)
+
 }
 
 func TestDelete(t *testing.T) {

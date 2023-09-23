@@ -27,34 +27,14 @@ func NewJobMonitorHandle() *JobMonitorHandle {
 		timeoutDone: make(chan struct{}),
 	}
 }
-
 func (jobMonitor *JobMonitorHandle) Start() {
 	jobMonitor.EnableFailScan()
 	jobMonitor.EnableTimeoutScan()
 }
-func (jobMonitor *JobMonitorHandle) EnableFailScan() {
-	go func() {
-		log.Println("失败任务处理器已开启失败")
-		select {
-		case <-jobMonitor.failJobDone:
-			log.Println("失败任务处理器已关闭")
-			return
-		}
-	}()
-}
 
-func (jobMonitor *JobMonitorHandle) EnableTimeoutScan() {
-	go func() {
-		log.Println("超时任务处理器已开启")
-		select {
-		case <-jobMonitor.timeoutDone:
-			log.Println("超时任务处理器已关闭")
-			return
-		default:
-			jobMonitor.timeoutScan()
-			time.Sleep(time.Minute)
-		}
-	}()
+func (jobMonitor *JobMonitorHandle) Stop() {
+	jobMonitor.failJobDone <- struct{}{}
+	jobMonitor.timeoutDone <- struct{}{}
 }
 
 func (jobMonitor *JobMonitorHandle) Callback(ctx context.Context, resp *dispatch.CallbackResponse) (*emptypb.Empty, error) {
@@ -83,6 +63,50 @@ func (jobMonitor *JobMonitorHandle) handleLog(jobLog *do.JobLogDo, resp *dispatc
 	orm.DB.Updates(&jobLog)
 	jobMonitor.handleExecuteLog(resp.GetId(), resp.Logs)
 	jobMonitor.Unlock(job.Id)
+}
+
+func (jobMonitor *JobMonitorHandle) EnableFailScan() {
+	go func() {
+		log.Println("任务重试处理器已开启")
+		//wait job call
+		time.Sleep(time.Second)
+		select {
+		case <-jobMonitor.failJobDone:
+			log.Println("失败重试处理器已关闭")
+			return
+		default:
+			jobMonitor.retryJob()
+			time.Sleep(time.Second * 30)
+		}
+	}()
+}
+
+func (jobMonitor *JobMonitorHandle) retryJob() {
+	var jobLogs []bo.RetryJobBo
+	orm.DB.Raw(constant.RetryJob).Scan(&jobLogs)
+	if len(jobLogs) == 0 {
+		return
+	}
+	for _, jobLog := range jobLogs {
+		//Closed tasks do not need to be retried
+		if !jobLog.Enable {
+			continue
+		}
+	}
+}
+
+func (jobMonitor *JobMonitorHandle) EnableTimeoutScan() {
+	go func() {
+		log.Println("超时任务处理器已开启")
+		select {
+		case <-jobMonitor.timeoutDone:
+			log.Println("超时任务处理器已关闭")
+			return
+		default:
+			jobMonitor.timeoutScan()
+			time.Sleep(time.Minute)
+		}
+	}()
 }
 
 func (jobMonitor *JobMonitorHandle) Unlock(id int64) {
