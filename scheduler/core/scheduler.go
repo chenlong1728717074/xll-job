@@ -28,5 +28,5 @@ func NewScheduler(retry int32, expression string, jobHandler string, jobManager 
 
 // Execute At present, we can only implement single machine service call cluster deployment, and we will support cluster deployment in the future
 func (s *Scheduler) Execute() {
-	Execute(s)
+	TriggerExecute(s)
 }

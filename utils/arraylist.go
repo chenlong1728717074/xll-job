@@ -1,4 +1,4 @@
-package util
+package utils
 
 type Entry interface {
 	Equal(other interface{}) bool

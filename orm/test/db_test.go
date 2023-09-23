@@ -3,12 +3,15 @@ package test
 import (
 	"fmt"
 	"testing"
+	"time"
 	"xll-job/orm"
+	"xll-job/orm/bo"
+	"xll-job/orm/constant"
 	"xll-job/orm/do"
 )
 
 func TestDb(t *testing.T) {
-	//orm.DB.AutoMigrate(&do.JobLogDo{})
+	orm.DB.AutoMigrate(&do.JobLogDo{})
 	//orm.DB.AutoMigrate(&do.JobInfoDo{})
 	//orm.DB.AutoMigrate(&do.JobManagementDo{})
 	//orm.DB.AutoMigrate(&do.JobLockDo{})
@@ -24,9 +27,24 @@ func TestAdd(t *testing.T) {
 	fmt.Println(tx.RowsAffected)
 }
 func TestSelect(t *testing.T) {
-	var m do.JobManagementDo
-	orm.DB.First(&m, 8166072975360)
-	fmt.Println(m)
+	losedTime := time.Now().Add(-time.Minute * 10)
+	var jobLogs []do.JobLogDo
+	orm.DB.Model(&do.JobLogDo{}).
+		Where("dispatch_time < ? and execute_status = ?",
+			losedTime,
+			constant.InProgress,
+		).Find(&jobLogs)
+	fmt.Println(jobLogs)
+}
+
+func TestSelectSql(t *testing.T) {
+	var jobLogs []bo.JobTimeoutBo
+	orm.DB.Raw(constant.EffectiveTimeoutJob).Scan(&jobLogs)
+	fmt.Println(jobLogs)
+	fmt.Println(len(jobLogs))
+	for i := range jobLogs {
+		fmt.Println(jobLogs[i].Timeout)
+	}
 }
 
 func TestDelete(t *testing.T) {

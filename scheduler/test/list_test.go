@@ -3,10 +3,10 @@ package test
 import (
 	"fmt"
 	"testing"
-	"xll-job/scheduler/util"
+	"xll-job/utils"
 )
 
 func TestArray(t *testing.T) {
-	list := util.NewArrayList[util.String]()
+	list := utils.NewArrayList[utils.String]()
 	fmt.Println(list)
 }
