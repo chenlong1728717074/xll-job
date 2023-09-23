@@ -32,8 +32,7 @@ func NewRegisterHandle() *RegisterHandle {
 }
 func (register *RegisterHandle) Start() {
 	register.inspectServer()
-	//todo 该管道出现未知问题,项目中已使用替代方案,待解决后恢复此处
-	//register.registerServer()
+	register.registerServer()
 }
 
 func (register *RegisterHandle) Register(ctx context.Context, req *dispatch.RegisterRequest) (*emptypb.Empty, error) {
@@ -42,12 +41,11 @@ func (register *RegisterHandle) Register(ctx context.Context, req *dispatch.Regi
 	if m.Id == 0 {
 		return nil, errors.New("JobManagement NOT FOUND")
 	}
-	//register.registerNodeChan <- core.NewServiceNode(req.ServiceAddr, m.Id, m.AppName)
-	go register.addNode(core.NewServiceNode(req.ServiceAddr, m.Id, m.AppName))
+	register.registerNodeChan <- core.NewServiceNode(req.ServiceAddr, m.Id, m.AppName)
 	return &emptypb.Empty{}, nil
 }
 
-func (register *RegisterHandle) Stop(addr string) {
+func (register *RegisterHandle) Stop() {
 	register.flushDone <- struct{}{}
 	register.registerDone <- struct{}{}
 }
@@ -55,14 +53,13 @@ func (register *RegisterHandle) Stop(addr string) {
 func (register *RegisterHandle) registerServer() {
 	//添加服务,刷新服务
 	go func() {
-		log.Printf("已开启服务注册服务")
+		log.Printf("服务注册处理器已开启")
 		for {
 			select {
 			case <-register.registerDone:
-				fmt.Println("注册服务关闭....")
+				fmt.Println("注服务注册处理器已关闭....")
 				return
 			case node := <-register.registerNodeChan:
-				log.Println("监听到数据")
 				register.addNode(node)
 
 			}
@@ -83,17 +80,17 @@ func (register *RegisterHandle) addNode(node *core.ServiceNode) {
 		ServiceNodeList = append(ServiceNodeList, node)
 		register.lock.Unlock()
 	}
-	log.Printf("Registration from[%s]has been refreshed\n", node.Addr)
+	log.Printf("registration from[%s]has been refreshed\n", node.Addr)
 }
 func (register *RegisterHandle) inspectServer() {
 	go func() {
-		log.Println("服务刷新服务开启")
+		log.Println("服务检查处理器已开启")
 		//睡十秒,等待服务注册
 		time.Sleep(time.Second * 10)
 		for {
 			select {
 			case <-register.flushDone:
-				log.Println("服务检查关闭服务....")
+				log.Println("服务检查处理器已关闭....")
 				return
 			default:
 				go flushServer()
@@ -105,8 +102,7 @@ func (register *RegisterHandle) inspectServer() {
 
 func flushServer() {
 	startTime := time.Now().UnixNano() / 1000000
-	log.Printf("开始进行服务检查:%d\n", startTime)
-
+	log.Printf("start scrubbing service node[刷新服务]:%d\n", startTime)
 	now := time.Now().Add(-time.Second * 90)
 	newServiceNodeList := make([]*core.ServiceNode, 0)
 	//获取所有存活的服务
@@ -129,5 +125,6 @@ func flushServer() {
 		manager.ServerAddr = temp[k]
 	}
 	endTime := time.Now().UnixNano() / 1000000
-	log.Printf("服务检查结束:%d,耗时%d", endTime, endTime-startTime)
+	fmt.Println(ServiceNodeList)
+	log.Printf("service node refresh completed[刷新完成]:%d,time consuming:%d", endTime, endTime-startTime)
 }

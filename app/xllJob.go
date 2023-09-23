@@ -41,7 +41,7 @@ func (app *XllJobApp) Start() {
 	job.LoadJob()
 	job.Start()
 	//grpc监听服务
-	app.grpcServer = grpcLis()
+	app.grpcServer = grpcLis(job)
 	//路由
 	router.Router(app.engine)
 	go func() {
@@ -63,14 +63,14 @@ func (app *XllJobApp) Start() {
 
 	log.Println("Server exiting")
 }
-func grpcLis() *grpc.Server {
+func grpcLis(handle *handle.XllJobHandle) *grpc.Server {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", "127.0.0.1", 8082))
 	if err != nil {
 		panic(err)
 	}
 	server := grpc.NewServer()
-	dispatch.RegisterNodeServer(server, handle.NewRegisterHandle())
-	dispatch.RegisterJobServer(server, handle.NewJobMonitorHandle())
+	dispatch.RegisterNodeServer(server, handle.Register)
+	dispatch.RegisterJobServer(server, handle.Monitor)
 	go func() {
 		err := server.Serve(lis)
 		if err != nil {

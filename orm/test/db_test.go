@@ -12,7 +12,7 @@ func TestDb(t *testing.T) {
 	//orm.DB.AutoMigrate(&do.JobInfoDo{})
 	//orm.DB.AutoMigrate(&do.JobManagementDo{})
 	//orm.DB.AutoMigrate(&do.JobLockDo{})
-	orm.DB.AutoMigrate(&do.ExecutionLog{})
+	//orm.DB.AutoMigrate(&do.ExecutionLog{})
 }
 
 func TestAdd(t *testing.T) {

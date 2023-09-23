@@ -13,14 +13,15 @@ import (
 
 // JobMonitorHandle  这个结构体用于任务失败监听/**/
 type JobMonitorHandle struct {
-	retryDone   chan struct{}
+	failJobDone chan struct{}
 	timeoutDone chan struct{}
+
 	dispatch.UnimplementedJobServer
 }
 
 func NewJobMonitorHandle() *JobMonitorHandle {
 	return &JobMonitorHandle{
-		retryDone:   make(chan struct{}),
+		failJobDone: make(chan struct{}),
 		timeoutDone: make(chan struct{}),
 	}
 }
@@ -32,15 +33,23 @@ func (jobMonitor *JobMonitorHandle) Start() {
 func (jobMonitor *JobMonitorHandle) EnableFailScan() {
 
 	go func() {
-		log.Println("开启失败任务处理")
-		select {}
+		log.Println("失败任务处理器已开启失败")
+		select {
+		case <-jobMonitor.failJobDone:
+			log.Println("失败任务处理器已关闭")
+			return
+		}
 	}()
 }
 
 func (jobMonitor *JobMonitorHandle) EnableTimeoutScan() {
 	go func() {
-		log.Println("开启超时任务处理")
-		select {}
+		log.Println("超时任务处理器已开启")
+		select {
+		case <-jobMonitor.timeoutDone:
+			log.Println("超时任务处理器已关闭")
+			return
+		}
 	}()
 }
 

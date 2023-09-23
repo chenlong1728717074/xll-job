@@ -16,13 +16,14 @@ type XllJobHandle struct {
 	lock     sync.RWMutex
 	Trigger  *cron.Cron
 	Manager  map[int64]*core.JobManager
-	register *RegisterHandle
+	Register *RegisterHandle
+	Monitor  *JobMonitorHandle
 }
 
 func NewXllJobHandle() *XllJobHandle {
 	job := XllJobHandle{
 		lock:     sync.RWMutex{},
-		register: NewRegisterHandle(),
+		Register: NewRegisterHandle(),
 	}
 	return &job
 }
@@ -34,7 +35,6 @@ func (job *XllJobHandle) InitXllJob() {
 		job.Trigger = cron.New(cron.WithParser(cron.NewParser(
 			cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
 		)))
-		//job.trigger = cron.New()
 	}
 	if job.Manager == nil {
 		job.Manager = make(map[int64]*core.JobManager)
@@ -43,12 +43,12 @@ func (job *XllJobHandle) InitXllJob() {
 }
 func (job *XllJobHandle) Start() {
 	job.Trigger.Start()
-	job.register.Start()
+	job.Register.Start()
 }
 
 func (job *XllJobHandle) Stop() {
-	job.register.registerDone <- struct{}{}
-	job.register.flushDone <- struct{}{}
+	job.Trigger.Stop()
+	job.Register.Stop()
 }
 
 func (job *XllJobHandle) LoadJob() {
