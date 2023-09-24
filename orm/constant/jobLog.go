@@ -16,3 +16,9 @@ const (
 	ManualTriggering    = 1
 	AutomaticTriggering = 2
 )
+const (
+	NoProcessingRequired = 0
+	Processed            = 1
+	Warned               = 2
+	WarningFailed        = 3
+)

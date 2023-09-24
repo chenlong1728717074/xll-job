@@ -20,6 +20,7 @@ type JobLogDo struct {
 	ExecuteConsumingTime int64      `gorm:"comment:执行耗时"`
 	ExecuteStatus        int32      `gorm:"comment:执行状态 -1:未开始 1:进行中 2:执行成功 3:执行出现异常 4:执行超时"`
 	Remark               string     `gorm:"type:varchar(128);"`
+	ProcessingStatus     int32      `gorm:"default:0;comment:处理状态 0:无需处理 1:已处理 2:已预警 3:预警失败"`
 }
 
 func (JobLogDo) TableName() string {

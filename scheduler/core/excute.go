@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"time"
 	"xll-job/orm"
+	"xll-job/orm/constant"
 	"xll-job/orm/do"
 	"xll-job/scheduler/grpc/dispatch"
 )
@@ -18,11 +19,8 @@ func TriggerExecute(s *Scheduler) {
 		return
 	}
 	//service lock;Prevent parallel processing of tasks
-	lock := &do.JobLockDo{
-		Id: s.Id,
-	}
-	tx := orm.DB.Create(lock)
-	if tx.Error != nil || tx.RowsAffected == 0 {
+	lock := jobLock(s.Id)
+	if lock == nil {
 		return
 	}
 	//add Log
@@ -30,9 +28,9 @@ func TriggerExecute(s *Scheduler) {
 		JobId:                s.Id,
 		ManageId:             s.JobManager.Id,
 		DispatchHandler:      s.JobHandler,
-		Retry:                s.Retry,
+		Retry:                0,
+		ProcessingStatus:     constant.NoProcessingRequired,
 		ExecuteConsumingTime: -1,
-		ExecuteStatus:        -1,
 	}
 	orm.DB.Create(logDo)
 	//router
@@ -44,7 +42,12 @@ func TriggerExecute(s *Scheduler) {
 	logDo.ExecuteStatus = 1
 	addr := addrs[0].Addr
 	logDo.DispatchAddress = addr
-	if err := dispatchService(s, addr, logDo.Id); err != nil {
+	dispatchService(logDo, lock)
+
+}
+
+func dispatchService(logDo *do.JobLogDo, lock *do.JobLockDo) {
+	if err := callService(logDo.DispatchHandler, logDo.DispatchAddress, logDo.Id); err != nil {
 		//调度失败
 		logDo.DispatchStatus = 2
 		logDo.ExecuteStatus = -1
@@ -54,12 +57,36 @@ func TriggerExecute(s *Scheduler) {
 	orm.DB.Updates(logDo)
 }
 
-// RetryExecute call on retry
-func RetryExecute(s *Scheduler) {
-
+func jobLock(id int64) *do.JobLockDo {
+	lock := &do.JobLockDo{
+		Id: id,
+	}
+	tx := orm.DB.Create(lock)
+	if tx.Error != nil || tx.RowsAffected == 0 {
+		return nil
+	}
+	return lock
 }
 
-func dispatchService(s *Scheduler, addr string, logId int64) error {
+// RetryExecute call on retry
+func RetryExecute(jobLog *do.JobLogDo) {
+	lock := jobLock(jobLog.JobId)
+	if lock == nil {
+		return
+	}
+	now := time.Now()
+	jobLog.DispatchTime = &now
+	jobLog.DispatchStatus = 1
+	jobLog.ExecuteStatus = 1
+	jobLog.ExecuteStartTime = nil
+	jobLog.ExecuteEndTime = nil
+	jobLog.ExecuteConsumingTime = -1
+	jobLog.ExecuteStatus = 1
+	jobLog.Retry = jobLog.Retry + 1
+	dispatchService(jobLog, lock)
+}
+
+func callService(serviceId string, addr string, logId int64) error {
 	dial, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
@@ -68,8 +95,7 @@ func dispatchService(s *Scheduler, addr string, logId int64) error {
 	con := dispatch.NewServiceClient(dial)
 	//dispatch
 	_, callErr := con.Call(context.Background(), &dispatch.Request{
-		ServiceId:  s.JobHandler,
-		Retry:      s.Retry,
+		ServiceId:  serviceId,
 		CallbackId: logId,
 	})
 	return callErr

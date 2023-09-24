@@ -47,8 +47,10 @@ func TestSelectSql(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	lock := do.JobLockDo{
-		Id: 0,
-	}
-	orm.DB.Delete(lock)
+	//lock := do.JobLockDo{
+	//	Id: 0,
+	//}
+	//orm.DB.Delete(lock)
+	var lock do.JobLockDo
+	orm.DB.Raw(constant.GetLock, 1).Scan(&lock)
 }

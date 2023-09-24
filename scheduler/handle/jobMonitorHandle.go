@@ -3,6 +3,7 @@ package handle
 import (
 	"context"
 	"errors"
+	"github.com/jinzhu/copier"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"xll-job/orm/bo"
 	"xll-job/orm/constant"
 	"xll-job/orm/do"
+	"xll-job/scheduler/core"
 	"xll-job/scheduler/grpc/dispatch"
 	"xll-job/utils"
 )
@@ -51,8 +53,8 @@ func (jobMonitor *JobMonitorHandle) Callback(ctx context.Context, resp *dispatch
 func (jobMonitor *JobMonitorHandle) handleLog(jobLog *do.JobLogDo, resp *dispatch.CallbackResponse) {
 	var job do.JobInfoDo
 	orm.DB.First(&job, jobLog.JobId)
-	if job.Id == 0 || !job.Enable {
-		jobLog.Retry = 0
+	if jobLog.ExecuteStatus != constant.Timeout {
+		jobLog.ExecuteStatus = resp.Status
 	}
 	jobLog.ExecuteStatus = resp.Status
 	startTime := resp.StartTime.AsTime()
@@ -60,6 +62,10 @@ func (jobMonitor *JobMonitorHandle) handleLog(jobLog *do.JobLogDo, resp *dispatc
 	jobLog.ExecuteStartTime = &startTime
 	jobLog.ExecuteEndTime = &endTime
 	jobLog.ExecuteConsumingTime = utils.ComputingTime(startTime, endTime)
+	//The number of retries has reached the predetermined value
+	if job.Retry-jobLog.Retry == 0 {
+		jobLog.ProcessingStatus = constant.Processed
+	}
 	orm.DB.Updates(&jobLog)
 	jobMonitor.handleExecuteLog(resp.GetId(), resp.Logs)
 	jobMonitor.Unlock(job.Id)
@@ -70,13 +76,16 @@ func (jobMonitor *JobMonitorHandle) EnableFailScan() {
 		log.Println("任务重试处理器已开启")
 		//wait job call
 		time.Sleep(time.Second)
-		select {
-		case <-jobMonitor.failJobDone:
-			log.Println("失败重试处理器已关闭")
-			return
-		default:
-			jobMonitor.retryJob()
-			time.Sleep(time.Second * 30)
+		for {
+			select {
+			case <-jobMonitor.failJobDone:
+				log.Println("失败重试处理器已关闭")
+				return
+			default:
+				jobMonitor.retryJob()
+				time.Sleep(time.Second * 10)
+			}
+
 		}
 	}()
 }
@@ -87,24 +96,38 @@ func (jobMonitor *JobMonitorHandle) retryJob() {
 	if len(jobLogs) == 0 {
 		return
 	}
+	lapseJob := make([]int64, 0)
+	retryJobs := make([]bo.RetryJobBo, 0)
 	for _, jobLog := range jobLogs {
-		//Closed tasks do not need to be retried
-		if !jobLog.Enable {
+		if jobLog.Enable {
+			retryJobs = append(retryJobs, jobLog)
 			continue
 		}
+		lapseJob = append(lapseJob, jobLog.JobId)
+	}
+	if len(lapseJob) != 0 {
+		orm.DB.Model(&do.JobLogDo{}).
+			Where("id in (?)", lapseJob).Update("processing_status", constant.Processed)
+	}
+	for _, retryJob := range retryJobs {
+		var joblog do.JobLogDo
+		copier.Copy(&joblog, &retryJob)
+		go core.RetryExecute(&joblog)
 	}
 }
 
 func (jobMonitor *JobMonitorHandle) EnableTimeoutScan() {
 	go func() {
 		log.Println("超时任务处理器已开启")
-		select {
-		case <-jobMonitor.timeoutDone:
-			log.Println("超时任务处理器已关闭")
-			return
-		default:
-			jobMonitor.timeoutScan()
-			time.Sleep(time.Minute)
+		for {
+			select {
+			case <-jobMonitor.timeoutDone:
+				log.Println("超时任务处理器已关闭")
+				return
+			default:
+				jobMonitor.timeoutScan()
+				time.Sleep(time.Minute)
+			}
 		}
 	}()
 }
@@ -153,8 +176,8 @@ func (jobMonitor *JobMonitorHandle) lapseTimeoutJobScan() {
 	}
 	for _, jobLog := range jobLogs {
 		//Tasks that do not exist do not need to be retried
-		jobLog.Retry = 0
 		jobLog.ExecuteStatus = constant.Timeout
+		jobLog.ProcessingStatus = constant.Processed
 		orm.DB.Updates(&jobLog)
 	}
 }
