@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"strconv"
 	"xll-job/orm"
 	"xll-job/orm/do"
 	"xll-job/scheduler/core"
@@ -54,17 +55,27 @@ func (jobInfoApi *JobInfoApi) update(ctx *gin.Context) {
 func (jobInfoApi *JobInfoApi) Add(ctx *gin.Context) {
 	var jobDto dto.JobInfoDto
 	ctx.BindJSON(&jobDto)
-
 	//七位cron转六位
 	jobDto.Cron = utils.RemoveYearField(jobDto.Cron)
-
+	//管理器
+	var jobManagemen do.JobManagementDo
+	orm.DB.First(&jobManagemen, jobDto.ManageId)
+	if jobManagemen.Id == 0 {
+		ctx.JSON(500, gin.Error{
+			Meta: "任务管理器不存在",
+		})
+		ctx.Done()
+		return
+	}
+	//添加
 	var jobInfoDo do.JobInfoDo
 	copier.Copy(&jobInfoDo, &jobDto)
 	jobInfoDo.Enable = false
 	orm.DB.Create(&jobInfoDo)
 	//添加缓存
 	manager := handle.JobManagerMap[jobDto.ManageId]
-	scheduler, _ := core.NewScheduler(jobInfoDo.Retry, jobInfoDo.Cron, jobInfoDo.JobHandler, manager, false)
+	scheduler, _ := core.NewScheduler(jobInfoDo.Retry, jobInfoDo.Cron, jobInfoDo.JobHandler, manager, false,
+		jobInfoDo.RoutingPolicy)
 	manager.Schedulers[jobInfoDo.Id] = scheduler
 	ctx.JSON(200, map[string]interface{}{
 		"message": "ok",
@@ -72,13 +83,78 @@ func (jobInfoApi *JobInfoApi) Add(ctx *gin.Context) {
 }
 
 func (jobInfoApi *JobInfoApi) stop(context *gin.Context) {
-
+	i := context.Query("id")
+	//获取
+	id, _ := strconv.ParseInt(i, 10, 64)
+	var jobInfoDo do.JobInfoDo
+	orm.DB.First(&jobInfoDo, id)
+	if jobInfoDo.Id == 0 {
+		context.JSON(500, gin.Error{
+			Meta: "条目不存在",
+		})
+		context.Done()
+		return
+	}
+	if !jobInfoDo.Enable {
+		context.JSON(200, map[string]interface{}{
+			"message": "ok",
+		})
+		context.Done()
+		return
+	}
+	orm.DB.Model(&do.JobInfoDo{}).Where("id = ?", id).Update("is_enable", 0)
+	//添加任务
+	handle.Xll_Job.StopJob(&jobInfoDo)
+	context.JSON(200, map[string]interface{}{
+		"message": "ok",
+	})
 }
 
 func (jobInfoApi *JobInfoApi) start(context *gin.Context) {
-
+	i := context.Query("id")
+	//获取
+	id, _ := strconv.ParseInt(i, 10, 64)
+	var jobInfoDo do.JobInfoDo
+	orm.DB.First(&jobInfoDo, id)
+	if jobInfoDo.Id == 0 {
+		context.JSON(500, gin.Error{
+			Meta: "条目不存在",
+		})
+		context.Done()
+		return
+	}
+	if jobInfoDo.Enable {
+		context.JSON(200, map[string]interface{}{
+			"message": "ok",
+		})
+		context.Done()
+		return
+	}
+	orm.DB.Model(&do.JobInfoDo{}).Where("id = ?", id).Update("is_enable", 1)
+	//添加任务
+	handle.Xll_Job.StartJob(&jobInfoDo)
+	context.JSON(200, map[string]interface{}{
+		"message": "ok",
+	})
 }
 
 func (jobInfoApi *JobInfoApi) delete(context *gin.Context) {
-
+	i := context.Query("id")
+	//获取
+	id, _ := strconv.ParseInt(i, 10, 64)
+	var jobInfoDo do.JobInfoDo
+	orm.DB.First(&jobInfoDo, id)
+	if jobInfoDo.Id == 0 {
+		context.JSON(500, gin.Error{
+			Meta: "条目不存在",
+		})
+		context.Done()
+		return
+	}
+	orm.DB.Delete(&jobInfoDo)
+	//删除缓存
+	handle.Xll_Job.DeleteJob(&jobInfoDo)
+	context.JSON(200, map[string]interface{}{
+		"message": "ok",
+	})
 }

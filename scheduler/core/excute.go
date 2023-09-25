@@ -18,11 +18,21 @@ func TriggerExecute(s *Scheduler) {
 	if len(addrs) == 0 {
 		return
 	}
-	//service lock;Prevent parallel processing of tasks
-	lock := jobLock(s.Id)
-	if lock == nil {
-		return
+	policy := s.RoutingPolicy
+	var lock *do.JobLockDo
+	switch policy {
+	case 1:
+		lock = jobLock(s.Id)
+		if lock == nil {
+			return
+		}
+		break
+	case 3:
+		//串行
+
 	}
+	//service lock;Prevent parallel processing of tasks
+
 	//add Log
 	logDo := &do.JobLogDo{
 		JobId:                s.Id,

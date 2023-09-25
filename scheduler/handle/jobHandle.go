@@ -77,11 +77,11 @@ func (job *XllJobHandle) LoadJob() {
 			continue
 		}
 		for _, infoDo := range jobs {
+			scheduler, _ := core.NewScheduler(infoDo.Retry, infoDo.Cron,
+				infoDo.JobHandler, jobManager, true, infoDo.RoutingPolicy)
+			scheduler.Id = infoDo.Id
+			jobManager.Schedulers[infoDo.Id] = scheduler
 			if infoDo.Enable {
-				scheduler, _ := core.NewScheduler(infoDo.Retry, infoDo.Cron,
-					infoDo.JobHandler, jobManager, true)
-				scheduler.Id = infoDo.Id
-				jobManager.Schedulers[infoDo.Id] = scheduler
 				//add job
 				enId, _ := Xll_Job.Trigger.AddFunc(infoDo.Cron, scheduler.Execute)
 				scheduler.TriggerId = enId
@@ -92,4 +92,30 @@ func (job *XllJobHandle) LoadJob() {
 		fmt.Println(v.Schedulers)
 	}
 	log.Printf("任务管理器加载成功,size=%d\n", len(manager))
+}
+func (job *XllJobHandle) StartJob(infoDo *do.JobInfoDo) {
+	manager := job.Manager[infoDo.ManageId]
+	scheduler := manager.Schedulers[infoDo.Id]
+	id, err := job.Trigger.AddFunc(infoDo.Cron, scheduler.Execute)
+	if err != nil {
+		panic(err)
+	}
+	scheduler.TriggerId = id
+}
+
+func (job *XllJobHandle) StopJob(infoDo *do.JobInfoDo) {
+	manager := job.Manager[infoDo.ManageId]
+	scheduler := manager.Schedulers[infoDo.Id]
+	id := scheduler.TriggerId
+	job.Trigger.Remove(id)
+	scheduler.TriggerId = 0
+}
+
+func (job *XllJobHandle) DeleteJob(infoDo *do.JobInfoDo) {
+	manager := job.Manager[infoDo.ManageId]
+	scheduler := manager.Schedulers[infoDo.Id]
+	if scheduler.TriggerId != 0 {
+		job.Trigger.Remove(scheduler.TriggerId)
+	}
+	delete(manager.Schedulers, infoDo.Id)
 }

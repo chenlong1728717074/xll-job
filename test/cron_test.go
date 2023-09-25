@@ -6,7 +6,8 @@ import (
 	"github.com/robfig/cron/v3"
 	"testing"
 	"time"
-	"xll-job/scheduler/handle"
+	"xll-job/orm"
+	"xll-job/orm/do"
 )
 
 func TestCron(t *testing.T) {
@@ -31,8 +32,5 @@ func TestCronexpr(t *testing.T) {
 	fmt.Println(nextTime)
 }
 func TestChan(t *testing.T) {
-	register := handle.NewRegisterHandle()
-	register.Start()
-	//register.RegisterNodeChan <- core.NewServiceNode("11", 1, "xx")
-	select {}
+	orm.DB.Model(&do.JobInfoDo{}).Where("id = ?", 1).Update("is_enable", 0)
 }
