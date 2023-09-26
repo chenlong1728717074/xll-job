@@ -50,5 +50,11 @@ func (api *AuthApi) login(context *gin.Context) {
 }
 
 func (api *AuthApi) current(context *gin.Context) {
-
+	value, _ := context.Get("claims")
+	claims := value.(*utils.CustomClaims)
+	context.JSON(http.StatusOK, map[string]interface{}{
+		"id":       claims.Id,
+		"userName": claims.UserName,
+		"role":     claims.Role,
+	})
 }
