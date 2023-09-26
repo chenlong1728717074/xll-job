@@ -78,18 +78,14 @@ func (managementApi *JobManagementApi) delete(context *gin.Context) {
 	var manager do.JobManagementDo
 	orm.DB.First(&manager, id)
 	if manager.Id == 0 {
-		context.JSON(500, gin.Error{
-			Meta: "任务管理器不存在",
-		})
+		context.JSON(200, dto.NewErrResponse("任务管理器不存在", ""))
 		context.Done()
 		return
 	}
 	var count int64
 	orm.DB.Model(&do.JobInfoDo{}).Where("manage_id=? and is_enable=?", id, 1).Count(&count)
 	if count != 0 {
-		context.JSON(500, gin.Error{
-			Meta: "该任务管理器下有已开启任务",
-		})
+		context.JSON(200, dto.NewErrResponse("该任务管理器下有已开启任务", ""))
 		context.Done()
 		return
 	}
@@ -99,7 +95,5 @@ func (managementApi *JobManagementApi) delete(context *gin.Context) {
 	job := handle.Xll_Job
 	fmt.Println(job)
 	delete(handle.JobManagerMap, id)
-	context.JSON(200, map[string]interface{}{
-		"message": "ok",
-	})
+	context.JSON(200, dto.NewOkResponse(""))
 }

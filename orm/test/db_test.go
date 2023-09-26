@@ -8,14 +8,16 @@ import (
 	"xll-job/orm/bo"
 	"xll-job/orm/constant"
 	"xll-job/orm/do"
+	"xll-job/utils"
 )
 
 func TestDb(t *testing.T) {
-	orm.DB.AutoMigrate(&do.JobLogDo{})
-	orm.DB.AutoMigrate(&do.JobInfoDo{})
-	orm.DB.AutoMigrate(&do.JobManagementDo{})
-	orm.DB.AutoMigrate(&do.JobLockDo{})
-	orm.DB.AutoMigrate(&do.ExecutionLog{})
+	orm.DB.AutoMigrate(&do.UserDo{})
+	//orm.DB.AutoMigrate(&do.JobLogDo{})
+	//orm.DB.AutoMigrate(&do.JobInfoDo{})
+	//orm.DB.AutoMigrate(&do.JobManagementDo{})
+	//orm.DB.AutoMigrate(&do.JobLockDo{})
+	//orm.DB.AutoMigrate(&do.ExecutionLog{})
 }
 
 func TestAdd(t *testing.T) {
@@ -53,4 +55,14 @@ func TestDelete(t *testing.T) {
 	//orm.DB.Delete(lock)
 	var lock do.JobLockDo
 	orm.DB.Raw(constant.GetLock, 1).Scan(&lock)
+}
+func TestAddUser(t *testing.T) {
+	salt, password := utils.GeneratePassword("admin")
+	user := &do.UserDo{
+		UserName: "admin",
+		Password: password,
+		Salt:     salt,
+		Role:     1,
+	}
+	orm.DB.Create(user)
 }

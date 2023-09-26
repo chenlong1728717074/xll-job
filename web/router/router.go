@@ -1,23 +1,20 @@
 package router
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
-	"runtime"
 	"xll-job/web/api"
+	"xll-job/web/middlewares"
 )
 
 func Router(engine *gin.Engine) {
-	engine.GET("/moniter", func(context *gin.Context) {
-		buf := make([]byte, 1<<16)
-		runtime.Stack(buf, true)
-		fmt.Printf("%s", buf)
-		context.JSON(200, map[string]interface{}{
-			"msg": string(buf),
-		})
-	})
-	managementApi := api.NewJobManagementApi(engine.Group("/jobManagement"))
+	managementApi := api.NewJobManagementApi(engine.Group("/jobManagement", middlewares.JWTAuth()))
 	managementApi.Router()
-	infoApi := api.NewJobInfoApi(engine.Group("/jobInfo"))
+	infoApi := api.NewJobInfoApi(engine.Group("/jobInfo", middlewares.JWTAuth()))
 	infoApi.Router()
+	userApi := api.NewUserApi(engine.Group("/user", middlewares.JWTAuth(), middlewares.AdminAuth()))
+	userApi.Router()
+	authApi := api.NewAuthApi(engine.Group("/auth"))
+	authApi.Router()
+	monitorApi := api.NewMonitorApi(engine.Group("/monitor"))
+	monitorApi.Router()
 }
