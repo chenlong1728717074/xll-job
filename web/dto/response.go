@@ -26,9 +26,10 @@ func NewOkResponse[T any](t T) *Response[T] {
 	return resp
 }
 func NewErrResponse[T any](msg string, t T) *Response[T] {
-	resp := &Response[T]{
+	var resp = &Response[T]{
 		Code: constant.HttpErr,
 		Msg:  msg,
+		Data: t,
 	}
 	return resp
 }

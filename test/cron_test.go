@@ -45,6 +45,10 @@ func TestPassword(t *testing.T) {
 	fmt.Println(verify)
 }
 
+func TestJwt(t *testing.T) {
+
+}
+
 func TestRunTime(t *testing.T) {
 	fmt.Println(runtime.GOOS)   // 输出操作系统架构
 	fmt.Println(runtime.GOARCH) // 输出操作系统名称

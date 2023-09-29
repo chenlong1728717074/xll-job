@@ -22,7 +22,7 @@ func NewAuthApi(router *gin.RouterGroup) *AuthApi {
 
 func (api *AuthApi) Router() {
 	api.router.POST("/login", api.login)
-	api.router.GET("/current", middlewares.JWTAuth(), api.current)
+	api.router.GET("/`current`", middlewares.JWTAuth(), api.current)
 }
 
 func (api *AuthApi) login(context *gin.Context) {
