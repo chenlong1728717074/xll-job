@@ -43,6 +43,17 @@ func (api *UserApi) add(ctx *gin.Context) {
 	user.Salt = salt
 	user.UserName = userDto.UserName
 	orm.DB.Create(&user)
+	//先删除后bind
+	orm.DB.Where("user_id=?", 1).Delete(&do.UserManager{})
+
+	var ums []*do.UserManager
+	for _, managerId := range userDto.Manager {
+		ums = append(ums, &do.UserManager{
+			UserId:    user.Id,
+			ManagerId: managerId,
+		})
+	}
+	orm.DB.Create(ums)
 	ctx.JSON(200, dto.NewOkResponse(""))
 }
 
@@ -62,7 +73,28 @@ func (api *UserApi) delete(ctx *gin.Context) {
 }
 
 func (api *UserApi) update(ctx *gin.Context) {
-
+	var userDto dto.UserDto
+	ctx.ShouldBindJSON(&userDto)
+	var user do.UserDo
+	orm.DB.Model(&user).Where("user_name = ?", userDto.UserName).First(&user)
+	if user.UserName != "" {
+		ctx.JSON(200, dto.NewErrResponse("用户已存在", ""))
+		ctx.Done()
+		return
+	}
+	if len(userDto.Manager) == 0 {
+		//先删除后bind
+		orm.DB.Where("user_id=?", 1).Delete(&do.UserManager{})
+		var ums []*do.UserManager
+		for _, managerId := range userDto.Manager {
+			ums = append(ums, &do.UserManager{
+				UserId:    user.Id,
+				ManagerId: managerId,
+			})
+		}
+		orm.DB.Create(ums)
+	}
+	ctx.JSON(200, dto.NewOkResponse(""))
 }
 
 func (api *UserApi) getById(ctx *gin.Context) {
