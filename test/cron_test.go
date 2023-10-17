@@ -27,13 +27,20 @@ func TestCron(t *testing.T) {
 	select {}
 }
 func TestCronexpr(t *testing.T) {
-	expr, err := cronexpr.Parse("22 * * * * ? *")
+	var expression = "22 * * * * ? 2021-2023*"
+	//parse := cronexpr.MustParse(expression) 显示异常,不建议用
+	parse, err := cronexpr.Parse(expression)
 	if err != nil {
 		// 处理解析错误
-		panic(err)
+		fmt.Println(err.Error())
+		return
 	}
-	nextTime := expr.Next(time.Now())
-	fmt.Println(nextTime)
+	//nextTime := parse.Next(time.Now())  一次
+	//多次
+	arr := parse.NextN(time.Now(), 5)
+	for i := range arr {
+		fmt.Println(arr[i])
+	}
 }
 func TestChan(t *testing.T) {
 	orm.DB.Model(&do.JobInfoDo{}).Where("id = ?", 1).Update("is_enable", 0)
